@@ -90,8 +90,17 @@ const AppRoutes: React.FC<{ theme: string, toggleTheme: () => void }> = ({ theme
 
 const App: React.FC = () => {
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
+  const [configError, setConfigError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Check for critical configuration
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+      setConfigError("Missing Supabase Configuration. Please add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your Vercel Environment Variables.");
+    }
+
     const root = document.documentElement;
     if (theme === 'dark') root.classList.add('dark');
     else root.classList.remove('dark');
@@ -100,6 +109,21 @@ const App: React.FC = () => {
   const toggleTheme = () => {
     setTheme(curr => curr === 'dark' ? 'light' : 'dark');
   };
+
+  if (configError) {
+    return (
+      <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center p-4 text-center">
+        <div className="bg-red-500/10 border border-red-500 rounded-lg p-8 max-w-lg">
+          <h1 className="text-2xl font-bold text-red-500 mb-4">Configuration Error</h1>
+          <p className="mb-6 text-slate-300">{configError}</p>
+          <div className="text-left bg-slate-800 p-4 rounded text-sm font-mono overflow-auto">
+            <p>VITE_SUPABASE_URL: {import.meta.env.VITE_SUPABASE_URL ? '✅ Set' : '❌ Missing'}</p>
+            <p>VITE_SUPABASE_ANON_KEY: {import.meta.env.VITE_SUPABASE_ANON_KEY ? '✅ Set' : '❌ Missing'}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <Router>
