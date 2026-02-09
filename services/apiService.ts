@@ -3,25 +3,58 @@ import { supabase } from './supabase';
 
 class ApiService {
 
+  // Seeded PRNG for deterministic demo data
+  private seededRandom(seed: number): number {
+    const x = Math.sin(seed * 9999) * 10000;
+    return x - Math.floor(x);
+  }
+
+  // TMY Solar Profile for Serbia (50 kW system)
+  private readonly TMY_MONTHLY_KWH = [45, 60, 100, 130, 160, 175, 180, 160, 120, 80, 50, 40];
+  private readonly SUNRISE = [7.5, 7.0, 6.25, 5.5, 5.0, 4.75, 5.0, 5.5, 6.25, 7.0, 7.5, 7.75];
+  private readonly SUNSET = [16.5, 17.25, 18.0, 19.0, 19.75, 20.25, 20.0, 19.25, 18.25, 17.25, 16.5, 16.25];
+  private readonly CAPACITY_KW = 50;
+
+  // Generate solar production for a given timestamp
+  private getDemoGeneration(date: Date): number {
+    const month = date.getMonth();
+    const hour = date.getHours() + date.getMinutes() / 60;
+    const dayOfYear = Math.floor((date.getTime() - new Date(date.getFullYear(), 0, 0).getTime()) / 86400000);
+
+    const sr = this.SUNRISE[month];
+    const ss = this.SUNSET[month];
+
+    if (hour < sr || hour > ss) return 0;
+
+    const daylight = ss - sr;
+    const dailyTarget = (this.TMY_MONTHLY_KWH[month] / 30) * this.CAPACITY_KW;
+    const peakKw = dailyTarget / (daylight * 0.4);
+    const solarAngle = (hour - (sr + ss) / 2) / (daylight / 2);
+    const cloudFactor = 0.85 + 0.30 * (0.5 + 0.5 * Math.sin(dayOfYear * 0.5));
+
+    return Math.max(0, peakKw * Math.exp(-Math.pow(solarAngle, 2) * 3) * cloudFactor);
+  }
+
+  // Generate consumption for a given timestamp
+  private getDemoConsumption(date: Date): number {
+    const hour = date.getHours();
+    const seed = date.getTime() / 60000; // minute-based seed
+    const variation = this.seededRandom(seed) * 0.2;
+
+    if (hour >= 8 && hour <= 17) return 22 + 3 * variation;
+    if (hour >= 17 && hour <= 22) return 10 + 2 * variation;
+    return 5 + variation;
+  }
+
   // --- Realtime ---
 
   public subscribe(projectId: string, listener: (data: SolarReading) => void, isDemo: boolean = false) {
     if (isDemo) {
       const interval = setInterval(() => {
         const now = new Date();
-        const hour = now.getHours();
-        const isDay = hour > 6 && hour < 19;
-        let gen = 0;
-        if (isDay) {
-          const peak = 13;
-          const dist = Math.abs(hour - peak);
-          gen = Math.max(0, 10 - dist * 1.5) + (Math.random() * 0.5);
-        }
-
-        const load = 0.5 + Math.random() * 2;
+        const gen = this.getDemoGeneration(now);
+        const load = this.getDemoConsumption(now);
         const self = Math.min(gen, load);
-        const exp = Math.max(0, gen - self);
-        const imp = Math.max(0, load - self);
 
         listener({
           id: 'demo-' + now.getTime(),
@@ -29,8 +62,8 @@ class ApiService {
           P_pv: gen,
           P_load: load,
           P_self: self,
-          P_export: exp,
-          P_import: imp
+          P_export: Math.max(0, gen - self),
+          P_import: Math.max(0, load - self)
         });
       }, 5000);
 
@@ -166,17 +199,16 @@ class ApiService {
   public async getHistory(projectId: string, isDemo: boolean = false): Promise<SolarReading[]> {
     if (isDemo) {
       const data: SolarReading[] = [];
-      const now = Date.now();
-      for (let i = 20; i >= 0; i--) {
-        const t = now - (i * 5 * 60 * 1000);
-        const hour = new Date(t).getHours();
-        let gen = 0;
-        if (hour > 6 && hour < 19) gen = Math.max(0, 10 - Math.abs(hour - 13) * 1.5) + Math.random();
-        const load = 1.5 + Math.random() * 2.5;
+      const now = new Date();
+      // Generate 60 data points for last 1 hour (1-minute intervals)
+      for (let i = 59; i >= 0; i--) {
+        const t = new Date(now.getTime() - (i * 60 * 1000));
+        const gen = this.getDemoGeneration(t);
+        const load = this.getDemoConsumption(t);
         const self = Math.min(gen, load);
         data.push({
           id: 'demo-hist-' + i,
-          timestamp: new Date(t).toISOString(),
+          timestamp: t.toISOString(),
           P_pv: gen,
           P_load: load,
           P_self: self,
@@ -393,46 +425,57 @@ class ApiService {
       const series: EnergySeriesPoint[] = [];
       const now = new Date();
       const count = range === 'day' ? 24 : range === 'week' ? 7 : range === 'month' ? 30 : 12;
-      const baseYield = [55, 75, 115, 145, 175, 195, 210, 190, 140, 95, 60, 45];
-      const capacity = 50;
+      const monthNames = ["Jan", "Feb", "Mar", "Apr", "Maj", "Jun", "Jul", "Avg", "Sep", "Okt", "Nov", "Dec"];
 
       for (let i = 0; i < count; i++) {
         let gen = 0;
         let cons = 0;
-        let label = i.toString();
-        let timestamp = new Date().toISOString();
+        let label = '';
+        let timestamp = now.toISOString();
 
         if (range === 'day') {
-          const hour = i;
-          label = `${hour}:00`;
-          if (hour > 6 && hour < 19) {
-            const intensity = Math.max(0, 1 - Math.pow((hour - 13) / 6, 2));
-            const monthYield = baseYield[now.getMonth()] / 30;
-            gen = capacity * (monthYield / 8) * intensity * (0.8 + Math.random() * 0.4);
+          // Hourly data for today
+          const hourDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), i);
+          gen = this.getDemoGeneration(hourDate);
+          cons = this.getDemoConsumption(hourDate);
+          label = `${i}:00`;
+          timestamp = hourDate.toISOString();
+        } else if (range === 'week') {
+          // Daily data for last 7 days
+          const dayDate = new Date(now.getTime() - (6 - i) * 24 * 60 * 60 * 1000);
+          // Sum 24 hours for daily total
+          for (let h = 0; h < 24; h++) {
+            const hourDate = new Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate(), h);
+            gen += this.getDemoGeneration(hourDate);
+            cons += this.getDemoConsumption(hourDate);
           }
-          const isWorkHour = hour >= 8 && hour <= 17;
-          cons = (isWorkHour ? 15 : 4) + Math.random() * 3;
+          label = dayDate.toLocaleDateString('sr-RS', { day: 'numeric', month: 'short' });
+          timestamp = dayDate.toISOString();
+        } else if (range === 'month') {
+          // Daily data for last 30 days
+          const dayDate = new Date(now.getTime() - (29 - i) * 24 * 60 * 60 * 1000);
+          for (let h = 0; h < 24; h++) {
+            const hourDate = new Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate(), h);
+            gen += this.getDemoGeneration(hourDate);
+            cons += this.getDemoConsumption(hourDate);
+          }
+          label = `Dan ${i + 1}`;
+          timestamp = dayDate.toISOString();
         } else {
-          const monthIdx = range === 'year' ? i : now.getMonth();
-          const monthlyGen = capacity * baseYield[monthIdx] * (0.9 + Math.random() * 0.2);
-          const monthlyCons = 4500 * (0.9 + Math.random() * 0.2);
-
-          if (range === 'year') {
-            gen = monthlyGen;
-            cons = monthlyCons;
-            label = ["Jan", "Feb", "Mar", "Apr", "Maj", "Jun", "Jul", "Avg", "Sep", "Okt", "Nov", "Dec"][i];
-          } else {
-            gen = monthlyGen / 30;
-            cons = monthlyCons / 30;
-            label = `Dan ${i + 1}`;
-          }
+          // Monthly data for year
+          const monthDate = new Date(now.getFullYear(), i, 15);
+          const daysInMonth = new Date(now.getFullYear(), i + 1, 0).getDate();
+          // Calculate monthly totals using TMY values
+          gen = this.TMY_MONTHLY_KWH[i] * this.CAPACITY_KW;
+          // Consumption: ~113,000 kWh/year / 12 months with variation
+          cons = (113000 / 12) * (0.9 + 0.2 * this.seededRandom(i * 1000));
+          label = monthNames[i];
+          timestamp = monthDate.toISOString();
         }
 
         const vt = cons * 0.7;
         const nt = cons * 0.3;
         const self = Math.min(gen, vt);
-        const exp = Math.max(0, gen - self);
-        const ivt = Math.max(0, vt - self);
 
         series.push({
           label,
@@ -442,9 +485,9 @@ class ApiService {
           consumptionVT: vt,
           consumptionNT: nt,
           selfConsumption: self,
-          export: exp,
-          import: ivt + nt,
-          importVT: ivt,
+          export: Math.max(0, gen - self),
+          import: Math.max(0, vt - self) + nt,
+          importVT: Math.max(0, vt - self),
           importNT: nt
         });
       }
