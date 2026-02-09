@@ -1,0 +1,5 @@
+{
+  "name": "Azimut Monitoring",
+  "description": "Sistem za praćenje solarne elektrane u realnom vremenu koji računa samopotrošnju, uvoz i izvoz energije.",
+  "requestFramePermissions": []
+}
