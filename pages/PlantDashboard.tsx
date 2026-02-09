@@ -168,6 +168,12 @@ export const PlantDashboard: React.FC<{ theme: 'light' | 'dark' }> = ({ theme })
       : { P_pv: 0, P_load: 0, P_self: 0, P_export: 0, P_import: 0 };
   }, [realtimeData]);
 
+  // Filter realtime data to last 1 hour for chart display
+  const realtimeDisplayData = useMemo(() => {
+    const oneHourAgo = Date.now() - 60 * 60 * 1000;
+    return realtimeData.filter(r => new Date(r.timestamp).getTime() > oneHourAgo);
+  }, [realtimeData]);
+
   const selfConsumptionRate = latest.P_pv > 0
     ? Math.min((latest.P_self / latest.P_pv) * 100, 100)
     : 0;
@@ -387,7 +393,7 @@ export const PlantDashboard: React.FC<{ theme: 'light' | 'dark' }> = ({ theme })
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
               <div className="xl:col-span-2 h-[350px] md:h-[400px]">
                 <RealTimeChart
-                  data={realtimeData}
+                  data={realtimeDisplayData}
                   selectedMetric={selectedChartMetric}
                   onReset={() => setSelectedChartMetric('ALL')}
                   theme={theme}

@@ -466,26 +466,77 @@ class ApiService {
 
     if (!res || res.error || !res.data) return [];
 
-    const result: EnergySeriesPoint[] = [];
-    res.data.forEach((row: any) => {
-      const g = row.total_energy_produced || 0;
-      const c = row.total_energy_consumed || 0;
-      const s = Math.min(g, c);
-      const h = new Date(row.start_time).getHours();
-      const vt = (h >= 7 && h < 23) ? c : 0;
-      const nt = (h < 7 || h >= 23) ? c : 0;
-      const self = Math.min(g, vt);
-
-      result.push({
-        label: h + ':00',
-        timestamp: row.start_time,
-        generation: g, consumption: c, consumptionVT: vt, consumptionNT: nt,
-        selfConsumption: self, export: Math.max(0, g - self), import: Math.max(0, c - self),
-        importVT: Math.max(0, vt - self),
-        importNT: nt
+    // Aggregate data based on range
+    if (range === 'day') {
+      // Hourly data - no aggregation needed
+      return res.data.map((row: any) => {
+        const g = row.total_energy_produced || 0;
+        const c = row.total_energy_consumed || 0;
+        const h = new Date(row.start_time).getHours();
+        const vt = (h >= 7 && h < 23) ? c : 0;
+        const nt = (h < 7 || h >= 23) ? c : 0;
+        const self = Math.min(g, vt);
+        return {
+          label: h + ':00',
+          timestamp: row.start_time,
+          generation: g, consumption: c, consumptionVT: vt, consumptionNT: nt,
+          selfConsumption: self, export: Math.max(0, g - self), import: Math.max(0, c - self),
+          importVT: Math.max(0, vt - self), importNT: nt
+        };
       });
-    });
-    return result;
+    } else if (range === 'week' || range === 'month') {
+      // Aggregate by day
+      const dailyMap: { [key: string]: { g: number, c: number, vt: number, nt: number, date: Date } } = {};
+      res.data.forEach((row: any) => {
+        const d = new Date(row.start_time);
+        const key = d.toISOString().split('T')[0];
+        const h = d.getHours();
+        const g = row.total_energy_produced || 0;
+        const c = row.total_energy_consumed || 0;
+        if (!dailyMap[key]) dailyMap[key] = { g: 0, c: 0, vt: 0, nt: 0, date: d };
+        dailyMap[key].g += g;
+        dailyMap[key].c += c;
+        if (h >= 7 && h < 23) dailyMap[key].vt += c;
+        else dailyMap[key].nt += c;
+      });
+      return Object.entries(dailyMap).map(([key, v]) => {
+        const self = Math.min(v.g, v.vt);
+        return {
+          label: v.date.toLocaleDateString('sr-RS', { day: 'numeric', month: 'short' }),
+          timestamp: v.date.toISOString(),
+          generation: v.g, consumption: v.c, consumptionVT: v.vt, consumptionNT: v.nt,
+          selfConsumption: self, export: Math.max(0, v.g - self),
+          import: Math.max(0, v.vt - self) + v.nt, importVT: Math.max(0, v.vt - self), importNT: v.nt
+        };
+      });
+    } else {
+      // Year - aggregate by month
+      const monthlyMap: { [key: number]: { g: number, c: number, vt: number, nt: number } } = {};
+      const monthNames = ["Jan", "Feb", "Mar", "Apr", "Maj", "Jun", "Jul", "Avg", "Sep", "Okt", "Nov", "Dec"];
+      res.data.forEach((row: any) => {
+        const d = new Date(row.start_time);
+        const m = d.getMonth();
+        const h = d.getHours();
+        const g = row.total_energy_produced || 0;
+        const c = row.total_energy_consumed || 0;
+        if (!monthlyMap[m]) monthlyMap[m] = { g: 0, c: 0, vt: 0, nt: 0 };
+        monthlyMap[m].g += g;
+        monthlyMap[m].c += c;
+        if (h >= 7 && h < 23) monthlyMap[m].vt += c;
+        else monthlyMap[m].nt += c;
+      });
+      return Object.entries(monthlyMap).map(([m, v]) => {
+        const mi = parseInt(m);
+        const self = Math.min(v.g, v.vt);
+        return {
+          label: monthNames[mi],
+          timestamp: new Date(new Date().getFullYear(), mi, 1).toISOString(),
+          generation: v.g, consumption: v.c, consumptionVT: v.vt, consumptionNT: v.nt,
+          selfConsumption: self, export: Math.max(0, v.g - self),
+          import: Math.max(0, v.vt - self) + v.nt, importVT: Math.max(0, v.vt - self), importNT: v.nt
+        };
+      });
+    }
   }
 
   public async getHistorySeries(projectId: string, startDate: string, endDate: string, isDemo: boolean = false): Promise<EnergySeriesPoint[]> {
