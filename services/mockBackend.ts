@@ -16,9 +16,9 @@ type Listener = (data: SolarReading) => void;
 class MockBackendService {
   private listeners: Map<string, Listener[]> = new Map(); // Map<ProjectId, Listeners[]>
   private intervalId: number | null = null;
-  
+
   // --- MOCK DATABASE ---
-  
+
   private users: User[] = [
     {
       id: 'u1',
@@ -103,7 +103,7 @@ class MockBackendService {
 
   // In-memory storage for readings per project
   private projectReadings: Map<string, SolarReading[]> = new Map();
-  
+
   // Store past days for history filtering
   private mockHistory: DailyEnergyStats[] = [];
 
@@ -179,15 +179,15 @@ class MockBackendService {
       const date = new Date(today);
       date.setDate(date.getDate() - i);
       const dateStr = date.toISOString().split('T')[0];
-      
+
       // Seasonal variation (sinusoidal over 365 days)
       const dayOfYear = i;
       const seasonFactor = 0.5 + 0.5 * Math.sin((2 * Math.PI * (365 - dayOfYear)) / 365);
-      
+
       const gen = (20 + Math.random() * 15) * seasonFactor; // Less generation in winter
       const load = 15 + Math.random() * 10;
       const self = Math.min(gen, load) * (0.6 + Math.random() * 0.3);
-      
+
       this.mockHistory.push({
         date: dateStr,
         totalGeneration: gen,
@@ -200,7 +200,7 @@ class MockBackendService {
   }
 
   // --- REAL-TIME SIMULATION ---
-  
+
   public subscribe(projectId: string, listener: Listener) {
     if (!this.listeners.has(projectId)) {
       this.listeners.set(projectId, []);
@@ -216,14 +216,14 @@ class MockBackendService {
 
   private calculateSolarAndLoad(date: Date, installedPower: number, offsetSeed: number): { P_pv: number, P_load: number } {
     const hour = date.getHours() + date.getMinutes() / 60;
-    
+
     // Solar Simulation
     let pv_potential = 0;
     if (hour > 6 && hour < 20) {
       pv_potential = Math.sin(((hour - 6) / 14) * Math.PI) * installedPower;
     }
     // Use offsetSeed to make different projects look different
-    const noise = (Math.sin(date.getTime() + offsetSeed) + 1) / 2; 
+    const noise = (Math.sin(date.getTime() + offsetSeed) + 1) / 2;
     const cloudCover = Math.random() > 0.9 ? 0.2 : 1; // Occasional cloud
     const pv = Math.max(0, pv_potential * (0.7 + noise * 0.3) * cloudCover);
 
@@ -253,16 +253,18 @@ class MockBackendService {
       // Skip offline projects for generation, but still might have load
       if (project.status === 'OFFLINE') {
         project.currentPowerKw = 0;
-        return; 
+        return;
       }
 
       const seed = index * 1000;
       const { P_pv, P_load } = this.calculateSolarAndLoad(now, project.installedPowerKw, seed);
-      
+
       // P_self = min(P_pv, P_load)
       const P_self = Math.min(P_pv, P_load);
       const P_export = Math.max(P_pv - P_load, 0);
       const P_import = Math.max(P_load - P_pv, 0);
+      // Reactive: simulate ~30-50% of active import as reactive consumption
+      const Q_load = P_import > 0 ? +(P_import * (0.3 + Math.random() * 0.2)).toFixed(3) : 0;
 
       const reading: SolarReading = {
         id: Math.random().toString(36).substr(2, 9),
@@ -272,6 +274,8 @@ class MockBackendService {
         P_self,
         P_export,
         P_import,
+        Q_load,
+        Q_import: Q_load, // Solar produces no reactive, so consumption = import
       };
 
       // Update Project State (for Admin Dashboard)
@@ -300,7 +304,7 @@ class MockBackendService {
   // --- API ENDPOINTS ---
 
   public getProjectHistory(projectId: string) {
-    return [...(this.projectReadings.get(projectId) || [])]; 
+    return [...(this.projectReadings.get(projectId) || [])];
   }
 
   public getDailyStats(projectId: string) {
@@ -322,7 +326,7 @@ class MockBackendService {
 
     const start = new Date(startDate);
     const end = new Date(endDate);
-    
+
     // Check if today is included in range
     const todayStr = new Date().toISOString().split('T')[0];
     let includeToday = false;
@@ -363,37 +367,39 @@ class MockBackendService {
 
     return aggregated;
   }
-  
-  public getDetailedReadings(projectId: string, startDate: string, endDate: string): SolarReading[] {
-      const project = this.getProjectById(projectId);
-      const installedPower = project ? project.installedPowerKw : 5;
-      
-      const start = new Date(`${startDate}T00:00:00`);
-      const end = new Date(`${endDate}T23:59:59`);
-      const results: SolarReading[] = [];
-      
-      let currentTime = start.getTime();
-      const endTime = end.getTime();
-  
-      while (currentTime <= endTime) {
-        const dateObj = new Date(currentTime);
-        const { P_pv, P_load } = this.calculateSolarAndLoad(dateObj, installedPower, 0);
-        
-        const P_self = Math.min(P_pv, P_load);
-        const P_export = Math.max(P_pv - P_load, 0);
-        const P_import = Math.max(P_load - P_pv, 0);
 
-        results.push({
-            id: Math.random().toString(36),
-            timestamp: dateObj.toISOString(),
-            P_pv, P_load, P_self, P_export, P_import
-        });
-  
-        currentTime += 300000; // 5 min resolution for CSV export to save memory in demo
-      }
-  
-      return results;
+  public getDetailedReadings(projectId: string, startDate: string, endDate: string): SolarReading[] {
+    const project = this.getProjectById(projectId);
+    const installedPower = project ? project.installedPowerKw : 5;
+
+    const start = new Date(`${startDate}T00:00:00`);
+    const end = new Date(`${endDate}T23:59:59`);
+    const results: SolarReading[] = [];
+
+    let currentTime = start.getTime();
+    const endTime = end.getTime();
+
+    while (currentTime <= endTime) {
+      const dateObj = new Date(currentTime);
+      const { P_pv, P_load } = this.calculateSolarAndLoad(dateObj, installedPower, 0);
+
+      const P_self = Math.min(P_pv, P_load);
+      const P_export = Math.max(P_pv - P_load, 0);
+      const P_import = Math.max(P_load - P_pv, 0);
+
+      results.push({
+        id: Math.random().toString(36),
+        timestamp: dateObj.toISOString(),
+        P_pv, P_load, P_self, P_export, P_import,
+        Q_load: 0,
+        Q_import: 0
+      });
+
+      currentTime += 300000; // 5 min resolution for CSV export to save memory in demo
     }
+
+    return results;
+  }
 
   // --- NEW: TIME SERIES DATA FOR CHARTS ---
 
@@ -409,18 +415,18 @@ class MockBackendService {
       for (let h = 0; h < 24; h++) {
         const date = new Date();
         date.setHours(h, 0, 0, 0);
-        
+
         // Simulate Bell curve for PV
         let gen = 0;
         if (h > 5 && h < 20) {
-           gen = Math.sin(((h - 5) / 15) * Math.PI) * (project?.installedPowerKw || 10) * 0.8;
-           // Random noise
-           gen = gen * (0.8 + Math.random() * 0.4);
+          gen = Math.sin(((h - 5) / 15) * Math.PI) * (project?.installedPowerKw || 10) * 0.8;
+          // Random noise
+          gen = gen * (0.8 + Math.random() * 0.4);
         }
-        
+
         const load = (project?.installedPowerKw || 10) * 0.2 + (Math.random() * 2);
         const self = Math.min(gen, load);
-        
+
         series.push({
           label: `${h}:00`,
           timestamp: date.toISOString(),
@@ -431,13 +437,13 @@ class MockBackendService {
           import: Math.max(0, load - self)
         });
       }
-    } 
+    }
     else if (range === 'week') {
       // Last 7 days from mockHistory
       const endDate = new Date().toISOString().split('T')[0];
       const startDate = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
       const stats = this.mockHistory.filter(d => d.date >= startDate && d.date <= endDate);
-      
+
       stats.forEach(s => {
         series.push({
           label: new Date(s.date).toLocaleDateString('sr-RS', { weekday: 'short' }),
@@ -455,7 +461,7 @@ class MockBackendService {
       const endDate = new Date().toISOString().split('T')[0];
       const startDate = new Date(Date.now() - 29 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
       const stats = this.mockHistory.filter(d => d.date >= startDate && d.date <= endDate);
-      
+
       stats.forEach(s => {
         series.push({
           label: new Date(s.date).getDate().toString(),
@@ -470,29 +476,29 @@ class MockBackendService {
     }
     else if (range === 'year') {
       // Aggregate by month (last 12 months)
-      const months: {[key: string]: EnergySeriesPoint} = {};
-      
+      const months: { [key: string]: EnergySeriesPoint } = {};
+
       // Init last 12 months
-      for(let i=11; i>=0; i--) {
-         const d = new Date();
-         d.setMonth(d.getMonth() - i);
-         const key = `${d.getFullYear()}-${d.getMonth()}`;
-         months[key] = {
-           label: d.toLocaleDateString('sr-RS', { month: 'short' }),
-           timestamp: d.toISOString(),
-           generation: 0, consumption: 0, selfConsumption: 0, export: 0, import: 0
-         };
+      for (let i = 11; i >= 0; i--) {
+        const d = new Date();
+        d.setMonth(d.getMonth() - i);
+        const key = `${d.getFullYear()}-${d.getMonth()}`;
+        months[key] = {
+          label: d.toLocaleDateString('sr-RS', { month: 'short' }),
+          timestamp: d.toISOString(),
+          generation: 0, consumption: 0, selfConsumption: 0, export: 0, import: 0
+        };
       }
 
       this.mockHistory.forEach(day => {
         const d = new Date(day.date);
         const key = `${d.getFullYear()}-${d.getMonth()}`;
         if (months[key]) {
-           months[key].generation += day.totalGeneration * scale;
-           months[key].consumption += day.totalConsumption * scale;
-           months[key].selfConsumption += day.totalSelfConsumption * scale;
-           months[key].export += day.totalExport * scale;
-           months[key].import += day.totalImport * scale;
+          months[key].generation += day.totalGeneration * scale;
+          months[key].consumption += day.totalConsumption * scale;
+          months[key].selfConsumption += day.totalSelfConsumption * scale;
+          months[key].export += day.totalExport * scale;
+          months[key].import += day.totalImport * scale;
         }
       });
 
@@ -507,28 +513,28 @@ class MockBackendService {
     const project = this.getProjectById(projectId);
     const scale = project ? project.installedPowerKw / 10 : 1;
     const series: EnergySeriesPoint[] = [];
-    
+
     const start = new Date(startDate);
     const end = new Date(endDate);
 
     const filtered = this.mockHistory.filter(d => {
-       const date = new Date(d.date);
-       return date >= start && date <= end;
+      const date = new Date(d.date);
+      return date >= start && date <= end;
     });
 
     // Sort by date ascending
     filtered.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     filtered.forEach(s => {
-        series.push({
-          label: s.date, // YYYY-MM-DD
-          timestamp: s.date,
-          generation: s.totalGeneration * scale,
-          consumption: s.totalConsumption * scale,
-          selfConsumption: s.totalSelfConsumption * scale,
-          export: s.totalExport * scale,
-          import: s.totalImport * scale
-        });
+      series.push({
+        label: s.date, // YYYY-MM-DD
+        timestamp: s.date,
+        generation: s.totalGeneration * scale,
+        consumption: s.totalConsumption * scale,
+        selfConsumption: s.totalSelfConsumption * scale,
+        export: s.totalExport * scale,
+        import: s.totalImport * scale
+      });
     });
 
     return series;

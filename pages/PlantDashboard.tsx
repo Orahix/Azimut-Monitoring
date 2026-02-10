@@ -8,7 +8,7 @@ import { DashboardCard } from '../components/DashboardCard';
 import { EnergyStatsChart } from '../components/EnergyStatsChart';
 import { EnergyFlow } from '../components/EnergyFlow';
 import { CHART_HISTORY_LENGTH, COLORS } from '../constants';
-import { Sun, Zap, ArrowUpRight, ArrowDownLeft, BatteryCharging, History as HistoryIcon, Calendar, Download, FileText, CalendarRange, CalendarDays, Filter, BarChart as BarChartIcon, BadgePercent } from 'lucide-react';
+import { Sun, Zap, ArrowUpRight, ArrowDownLeft, BatteryCharging, History as HistoryIcon, Calendar, Download, FileText, CalendarRange, CalendarDays, Filter, BarChart as BarChartIcon, BadgePercent, Activity } from 'lucide-react';
 import { ProjectSavingsTab } from '../components/ProjectSavingsTab';
 import { LiveBillCard } from '../components/LiveBillCard';
 import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -165,7 +165,7 @@ export const PlantDashboard: React.FC<{ theme: 'light' | 'dark' }> = ({ theme })
   const latest = useMemo(() => {
     return realtimeData.length > 0
       ? realtimeData[realtimeData.length - 1]
-      : { P_pv: 0, P_load: 0, P_self: 0, P_export: 0, P_import: 0 };
+      : { P_pv: 0, P_load: 0, P_self: 0, P_export: 0, P_import: 0, Q_load: 0, Q_import: 0, timestamp: '' };
   }, [realtimeData]);
 
   // Filter realtime data to last 1 hour for chart display
@@ -325,6 +325,7 @@ export const PlantDashboard: React.FC<{ theme: 'light' | 'dark' }> = ({ theme })
                 unit="kW"
                 colorClass="text-amber-500 dark:text-amber-400"
                 icon={<Sun size={24} />}
+                timestamp={latest.timestamp}
                 onClick={() => setSelectedChartMetric(selectedChartMetric === 'P_pv' ? 'ALL' : 'P_pv')}
                 isActive={selectedChartMetric === 'P_pv'}
               />
@@ -334,6 +335,7 @@ export const PlantDashboard: React.FC<{ theme: 'light' | 'dark' }> = ({ theme })
                 unit="kW"
                 colorClass="text-blue-500 dark:text-blue-400"
                 icon={<Zap size={24} />}
+                timestamp={latest.timestamp}
                 onClick={() => setSelectedChartMetric(selectedChartMetric === 'P_load' ? 'ALL' : 'P_load')}
                 isActive={selectedChartMetric === 'P_load'}
               />
@@ -344,6 +346,7 @@ export const PlantDashboard: React.FC<{ theme: 'light' | 'dark' }> = ({ theme })
                 colorClass="text-green-500 dark:text-green-400"
                 subValue={`${selfConsumptionRate.toFixed(0)}%`}
                 icon={<BatteryCharging size={24} />}
+                timestamp={latest.timestamp}
                 onClick={() => setSelectedChartMetric(selectedChartMetric === 'P_self' ? 'ALL' : 'P_self')}
                 isActive={selectedChartMetric === 'P_self'}
               />
@@ -353,6 +356,7 @@ export const PlantDashboard: React.FC<{ theme: 'light' | 'dark' }> = ({ theme })
                 unit="kW"
                 colorClass="text-orange-500 dark:text-orange-400"
                 icon={<ArrowUpRight size={24} />}
+                timestamp={latest.timestamp}
                 onClick={() => setSelectedChartMetric(selectedChartMetric === 'P_export' ? 'ALL' : 'P_export')}
                 isActive={selectedChartMetric === 'P_export'}
               />
@@ -362,9 +366,60 @@ export const PlantDashboard: React.FC<{ theme: 'light' | 'dark' }> = ({ theme })
                 unit="kW"
                 colorClass="text-red-500 dark:text-red-400"
                 icon={<ArrowDownLeft size={24} />}
+                timestamp={latest.timestamp}
                 onClick={() => setSelectedChartMetric(selectedChartMetric === 'P_import' ? 'ALL' : 'P_import')}
                 isActive={selectedChartMetric === 'P_import'}
               />
+            </div>
+
+            {/* REACTIVE ENERGY KPI GRID */}
+            <div>
+              <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                <Activity size={16} className="text-violet-500" />
+                Reaktivna Energija
+              </h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4">
+                <DashboardCard
+                  title="Reakt. Proizvodnja"
+                  value={0}
+                  unit="kVAr"
+                  colorClass="text-slate-400 dark:text-slate-500"
+                  icon={<Sun size={24} />}
+                  timestamp={latest.timestamp}
+                />
+                <DashboardCard
+                  title="Reakt. Potrošnja"
+                  value={latest.Q_load}
+                  unit="kVAr"
+                  colorClass="text-violet-500 dark:text-violet-400"
+                  icon={<Activity size={24} />}
+                  timestamp={latest.timestamp}
+                />
+                <DashboardCard
+                  title="Reakt. Samopotrošnja"
+                  value={0}
+                  unit="kVAr"
+                  colorClass="text-slate-400 dark:text-slate-500"
+                  icon={<BatteryCharging size={24} />}
+                  timestamp={latest.timestamp}
+                />
+                <DashboardCard
+                  title="Reakt. Export"
+                  value={0}
+                  unit="kVAr"
+                  colorClass="text-slate-400 dark:text-slate-500"
+                  icon={<ArrowUpRight size={24} />}
+                  timestamp={latest.timestamp}
+                />
+                <DashboardCard
+                  title="Reakt. Import"
+                  value={latest.Q_import}
+                  unit="kVAr"
+                  colorClass="text-pink-500 dark:text-pink-400"
+                  icon={<ArrowDownLeft size={24} />}
+                  timestamp={latest.timestamp}
+                />
+              </div>
             </div>
 
             {/* LIVE BILLING & STATUS ROW */}

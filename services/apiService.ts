@@ -55,6 +55,9 @@ class ApiService {
         const gen = this.getDemoGeneration(now);
         const load = this.getDemoConsumption(now);
         const self = Math.min(gen, load);
+        const P_import = Math.max(0, load - self);
+        // Reactive: simulate ~30-50% of active import as reactive consumption
+        const Q_load = P_import > 0 ? +(P_import * (0.3 + Math.random() * 0.2)).toFixed(3) : 0;
 
         listener({
           id: 'demo-' + now.getTime(),
@@ -63,9 +66,11 @@ class ApiService {
           P_load: load,
           P_self: self,
           P_export: Math.max(0, gen - self),
-          P_import: Math.max(0, load - self)
+          P_import,
+          Q_load,
+          Q_import: Q_load // Solar produces no reactive, so all reactive consumed = imported
         });
-      }, 5000);
+      }, 3000);
 
       return () => clearInterval(interval);
     }
@@ -82,6 +87,7 @@ class ApiService {
         },
         (payload) => {
           const row = payload.new;
+          const reactiveTotal = row.reactive_power_total || 0;
           listener({
             id: row.id.toString(),
             timestamp: row.recorded_at,
@@ -89,7 +95,9 @@ class ApiService {
             P_load: 0,
             P_self: 0,
             P_export: row.total_energy_export || 0,
-            P_import: row.total_energy_import || 0
+            P_import: row.total_energy_import || 0,
+            Q_load: reactiveTotal,
+            Q_import: reactiveTotal
           });
         }
       )
@@ -213,7 +221,9 @@ class ApiService {
           P_load: load,
           P_self: self,
           P_export: Math.max(0, gen - self),
-          P_import: Math.max(0, load - self)
+          P_import: Math.max(0, load - self),
+          Q_load: 0,
+          Q_import: 0
         });
       }
       return data;
@@ -234,7 +244,9 @@ class ApiService {
       P_load: 0,
       P_self: 0,
       P_export: row.total_energy_export || 0,
-      P_import: row.total_energy_import || 0
+      P_import: row.total_energy_import || 0,
+      Q_load: row.reactive_power_total || 0,
+      Q_import: row.reactive_power_total || 0
     }));
   }
 
@@ -416,7 +428,9 @@ class ApiService {
       P_pv: row.active_power_total || 0,
       P_load: 0, P_self: 0,
       P_export: row.total_energy_export || 0,
-      P_import: row.total_energy_import || 0
+      P_import: row.total_energy_import || 0,
+      Q_load: row.reactive_power_total || 0,
+      Q_import: row.reactive_power_total || 0
     }));
   }
 

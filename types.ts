@@ -11,6 +11,8 @@ export interface SolarReading {
   P_self: number;    // Self-consumption (kW)
   P_export: number;  // Export to grid (kW)
   P_import: number;  // Import from grid (kW)
+  Q_load: number;    // Reactive consumption (kVAr)
+  Q_import: number;  // Reactive import from grid (kVAr)
 }
 
 /**
