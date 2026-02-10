@@ -124,6 +124,9 @@ export interface TariffRates {
   exciseTaxPercent: number;
   vatPercent: number;
   reactiveEnergy: number;
+  reactiveEnergyPrice: number; // New: 1.13 rsd/kVArh
+  excessReactiveEnergyPrice: number; // New: 2.261 rsd/kVArh
+  maxigrafSurplusPrice: number; // New: 694.504 rsd/kW
   tvFee: number;
   investmentCost: number; // New: To control ROI/IRR
 }
@@ -138,7 +141,11 @@ export interface MonthlyInput {
   // New Physical Flow Data
   importVT: number;
   importNT: number;
+  reactiveImportVT: number;  // New
+  reactiveImportNT: number;  // New
   export: number;
+  reactiveExportVT: number;  // New
+  reactiveExportNT: number;  // New
   selfConsumption: number;
 }
 
@@ -174,6 +181,15 @@ export interface MonthlyCalculation {
   vatAmount: number;
   totalBillBeforeCredit: number;
   totalBill: number;
+  // Reactive & Maxigraf detailed breakdown
+  reactiveConsumptionVT: number;
+  reactiveConsumptionNT: number;
+  excessReactiveVT: number;
+  excessReactiveNT: number;
+  reactiveCost: number;
+  excessReactiveCost: number;
+  maxigrafSurplus: number;
+  maxigrafCost: number;
 }
 
 export interface CalculationResult {

@@ -39,6 +39,25 @@ export const calculateRow = (
     // The Solar Credit (Finance) - 90% of VT price for the recognized KWh
     const solarCreditGenerated = recognizedExportKwh * (rates.activeEnergyVT * 0.9);
 
+    // --- NEW: Reactive Energy Calculation ---
+    // limit for reactive energy is 0.32868 * active energy (for cos(phi)=0.95)
+    const reactiveLimitVT = preuzetaVT * 0.32868;
+    const reactiveLimitNT = preuzetaNT * 0.32868;
+
+    const reactiveImportVT = input.reactiveImportVT || 0;
+    const reactiveImportNT = input.reactiveImportNT || 0;
+
+    const excessReactiveVT = Math.max(0, reactiveImportVT - reactiveLimitVT);
+    const excessReactiveNT = Math.max(0, reactiveImportNT - reactiveLimitNT);
+
+    const reactiveCost = (reactiveImportVT + reactiveImportNT) * rates.reactiveEnergyPrice;
+    const excessReactiveCost = (excessReactiveVT + excessReactiveNT) * rates.excessReactiveEnergyPrice;
+
+    // --- NEW: Maxigraf Calculation ---
+    const maxPowerReading = input.maxPower || 0;
+    const maxigrafSurplus = Math.max(0, maxPowerReading - approvedPower);
+    const maxigrafCost = maxigrafSurplus * rates.maxigrafSurplusPrice;
+
     const powerCost = approvedPower * rates.approvedPowerPrice;
     const distCostVT = netVT * rates.distributionVT;
     const distCostNT = netNT * rates.distributionNT;
@@ -49,8 +68,8 @@ export const calculateRow = (
     const feeEffCost = totalKwhForFees * rates.feeEfficiency;
     const feesTotal = feeOIECost + feeEffCost + (rates.tvFee || 0);
 
-    const subtotal = energyTotal + accessTotal + feesTotal;
-    const exciseAmount = subtotal * (rates.exciseTaxPercent / 100);
+    const subtotal = energyTotal + accessTotal + feesTotal + reactiveCost + excessReactiveCost + maxigrafCost;
+    const exciseAmount = (energyTotal + accessTotal + feesTotal) * (rates.exciseTaxPercent / 100);
     const vatBase = subtotal + exciseAmount;
     const vatAmount = vatBase * (rates.vatPercent / 100);
     const totalBillBeforeCredit = vatBase + vatAmount;
@@ -88,7 +107,15 @@ export const calculateRow = (
         vatBase,
         vatAmount,
         totalBillBeforeCredit,
-        totalBill
+        totalBill,
+        reactiveConsumptionVT: reactiveImportVT,
+        reactiveConsumptionNT: reactiveImportNT,
+        excessReactiveVT,
+        excessReactiveNT,
+        reactiveCost,
+        excessReactiveCost,
+        maxigrafSurplus,
+        maxigrafCost
     };
 };
 
@@ -235,6 +262,9 @@ export const DEFAULT_RATES: TariffRates = {
     exciseTaxPercent: 7.5,
     vatPercent: 20,
     reactiveEnergy: 0.528,
+    reactiveEnergyPrice: 1.13,
+    excessReactiveEnergyPrice: 2.261,
+    maxigrafSurplusPrice: 694.504,
     tvFee: 0,
     investmentCost: 4000000
 };
@@ -251,3 +281,4 @@ export const MONTH_NAMES = [
     "Januar", "Februar", "Mart", "April", "Maj", "Jun",
     "Jul", "Avgust", "Septembar", "Oktobar", "Novembar", "Decembar"
 ];
+

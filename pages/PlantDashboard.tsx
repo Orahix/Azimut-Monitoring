@@ -422,7 +422,22 @@ export const PlantDashboard: React.FC<{ theme: 'light' | 'dark' }> = ({ theme })
               </div>
             </div>
 
-            {/* LIVE BILLING & STATUS ROW */}
+            {/* UPPER ROW: Real Time Chart + Energy Flow (Moved up for visibility) */}
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+              <div className="xl:col-span-2 h-[350px] md:h-[400px]">
+                <RealTimeChart
+                  data={realtimeDisplayData}
+                  selectedMetric={selectedChartMetric}
+                  onReset={() => setSelectedChartMetric('ALL')}
+                  theme={theme}
+                />
+              </div>
+              <div className="h-[300px] md:h-[400px]">
+                <EnergyFlow pv={latest.P_pv} load={latest.P_load} grid={latest.P_import - latest.P_export} />
+              </div>
+            </div>
+
+            {/* BILLING & STATUS ROW (Moved down) */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
               <div className="lg:col-span-1">
                 <LiveBillCard project={project} />
@@ -441,21 +456,6 @@ export const PlantDashboard: React.FC<{ theme: 'light' | 'dark' }> = ({ theme })
                     Prikaži detaljnu štednju
                   </button>
                 </div>
-              </div>
-            </div>
-
-            {/* UPPER ROW: Real Time Chart + Energy Flow */}
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-              <div className="xl:col-span-2 h-[350px] md:h-[400px]">
-                <RealTimeChart
-                  data={realtimeDisplayData}
-                  selectedMetric={selectedChartMetric}
-                  onReset={() => setSelectedChartMetric('ALL')}
-                  theme={theme}
-                />
-              </div>
-              <div className="h-[300px] md:h-[400px]">
-                <EnergyFlow pv={latest.P_pv} load={latest.P_load} grid={latest.P_import - latest.P_export} />
               </div>
             </div>
 
@@ -516,7 +516,7 @@ export const PlantDashboard: React.FC<{ theme: 'light' | 'dark' }> = ({ theme })
               <div className="w-full h-[400px] mt-2">
                 {balanceSeries.length > 0 ? (
                   <EnergyStatsChart
-                    data={balanceSeries}
+                    data={balanceSeries.filter(d => new Date(d.timestamp).getTime() <= Date.now())}
                     theme={theme}
                     selectedMetric={balanceMetric}
                     unit={balanceRange === 'day' ? 'kW' : 'kWh'}

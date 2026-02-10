@@ -73,7 +73,11 @@ export const MonthlyBillView: React.FC<MonthlyBillViewProps> = ({ data, approved
             solarProduction: 0,
             importVT: data.grossVT,
             importNT: data.grossNT,
+            reactiveImportVT: data.reactiveConsumptionVT || 0,
+            reactiveImportNT: data.reactiveConsumptionNT || 0,
             export: 0,
+            reactiveExportVT: 0,
+            reactiveExportNT: 0,
             selfConsumption: 0
         }, rates, approvedPower, 0, 0);
     }, [data, rates, approvedPower]);
@@ -127,24 +131,78 @@ export const MonthlyBillView: React.FC<MonthlyBillViewProps> = ({ data, approved
             </div>
 
             <div className="bill-content p-8 space-y-8 overflow-y-auto max-h-[60vh] custom-scrollbar">
+                {/* Section: Energija za obračun (New) */}
+                <section className="space-y-4">
+                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 dark:border-slate-800 pb-2 flex items-center gap-2">
+                        <div className="w-1 h-3 bg-blue-500 rounded-full"></div>
+                        Energija za obračun
+                    </h4>
+                    <div className="grid grid-cols-2 gap-8">
+                        <div>
+                            <p className="text-[9px] font-black text-slate-400 uppercase mb-2">Preuzeta Energija</p>
+                            <div className="space-y-1">
+                                <div className="flex justify-between text-xs">
+                                    <span className="text-slate-500">Aktivna VT:</span>
+                                    <span className="font-bold text-slate-700 dark:text-slate-300">{Math.round(activeData.grossVT).toLocaleString()} kWh</span>
+                                </div>
+                                <div className="flex justify-between text-xs">
+                                    <span className="text-slate-500">Aktivna NT:</span>
+                                    <span className="font-bold text-slate-700 dark:text-slate-300">{Math.round(activeData.grossNT).toLocaleString()} kWh</span>
+                                </div>
+                                <div className="flex justify-between text-xs">
+                                    <span className="text-slate-500">Reaktivna VT:</span>
+                                    <span className="font-bold text-slate-700 dark:text-slate-300">{Math.round(activeData.reactiveConsumptionVT || 0).toLocaleString()} kVArh</span>
+                                </div>
+                                <div className="flex justify-between text-xs">
+                                    <span className="text-slate-500">Reaktivna NT:</span>
+                                    <span className="font-bold text-slate-700 dark:text-slate-300">{Math.round(activeData.reactiveConsumptionNT || 0).toLocaleString()} kVArh</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                            <p className="text-[9px] font-black text-slate-400 uppercase mb-2">Isporučena Energija / Ostalo</p>
+                            <div className="space-y-1">
+                                <div className="flex justify-between text-xs">
+                                    <span className="text-slate-500">Aktivna Isporučena:</span>
+                                    <span className="font-bold text-emerald-600 dark:text-emerald-500">{Math.round(activeData.solarExported).toLocaleString()} kWh</span>
+                                </div>
+                                <div className="flex justify-between text-xs">
+                                    <span className="text-slate-500">Stanje Maksigrafa:</span>
+                                    <span className="font-bold text-amber-600 dark:text-amber-500">{activeData.maxPower.toFixed(2)} kW</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
                 {/* Section 2: Detailed Math Breakdown */}
                 <section className="space-y-6">
                     <BillSection title="1. Potrošnja i Mreža (RSD)">
-                        <BillRow label="Energija Snabdevanje (VT)" qty={activeData.netVT} price={rates.activeEnergyVT} total={activeData.energyCostVT} />
-                        <BillRow label="Energija Snabdevanje (NT)" qty={activeData.grossNT} price={rates.activeEnergyNT} total={activeData.energyCostNT} />
-                        <BillRow label="Obračunska Snaga" qty={approvedPower} price={rates.approvedPowerPrice} total={activeData.powerCost} />
-                        <BillRow label="Trošak Distribucije VT" qty={activeData.netVT} price={rates.distributionVT} total={activeData.distCostVT} />
-                        <BillRow label="Trošak Distribucije NT" qty={activeData.grossNT} price={rates.distributionNT} total={activeData.distCostNT} />
+                        <BillRow label="Aktivna energija (VT)" qty={activeData.netVT} price={rates.activeEnergyVT} total={activeData.energyCostVT} />
+                        <BillRow label="Aktivna energija (NT)" qty={activeData.grossNT} price={rates.activeEnergyNT} total={activeData.energyCostNT} />
+                        <BillRow label="Odobrena snaga" qty={approvedPower} price={rates.approvedPowerPrice} total={activeData.powerCost} />
+                        <BillRow label="Viša dnevna tarifa za aktivnu energiju" qty={activeData.netVT} price={rates.distributionVT} total={activeData.distCostVT} />
+                        <BillRow label="Niža dnevna tarifa za aktivnu energiju" qty={activeData.grossNT} price={rates.distributionNT} total={activeData.distCostNT} />
                     </BillSection>
 
-                    <BillSection title="2. Naknade i Takse">
+                    <BillSection title="2. Reaktivna Energija i Maksigraf">
+                        <BillRow label="Reaktivna energija" qty={(activeData.reactiveConsumptionVT || 0) + (activeData.reactiveConsumptionNT || 0)} price={rates.reactiveEnergyPrice} total={activeData.reactiveCost} />
+                        {(activeData.excessReactiveCost || 0) > 0 && (
+                            <BillRow label="Prekomerna reaktivna energija" qty={(activeData.excessReactiveVT || 0) + (activeData.excessReactiveNT || 0)} price={rates.excessReactiveEnergyPrice} total={activeData.excessReactiveCost} />
+                        )}
+                        {(activeData.maxigrafCost || 0) > 0 && (
+                            <BillRow label="Prekomerna snaga (Maksigraf)" qty={activeData.maxigrafSurplus} price={rates.maxigrafSurplusPrice} total={activeData.maxigrafCost} />
+                        )}
+                    </BillSection>
+
+                    <BillSection title="3. Naknade i Takse">
                         <BillRow label="Naknada za OIE" qty={activeData.netVT + activeData.grossNT} price={rates.feeOIE} total={activeData.feeOIECost} />
                         <BillRow label="Unapređenje En. Efikasnosti" qty={activeData.netVT + activeData.grossNT} price={rates.feeEfficiency} total={activeData.feeEffCost} />
                         {rates.tvFee > 0 && <BillRow label="Taksa za RTS" qty={1} price={rates.tvFee} total={rates.tvFee} />}
                     </BillSection>
 
-                    <BillSection title="3. Državne Obaveze">
-                        <BillRow label="Osnovica za Akcizu" total={activeData.subtotal} isTotalSmall />
+                    <BillSection title="4. Državne Obaveze">
+                        <BillRow label="Osnovica za Akcizu" total={activeData.energyTotal + activeData.accessTotal + activeData.feesTotal} isTotalSmall />
                         <BillRow label="Iznos Akcize (7.5%)" total={activeData.exciseAmount} />
                         <BillRow label="Osnovica za PDV" total={activeData.vatBase} isTotalSmall />
                         <BillRow label="Porez na dodatu vrednost (20%)" total={activeData.vatAmount} />
