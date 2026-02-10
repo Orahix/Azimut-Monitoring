@@ -96,7 +96,7 @@ export const MonthlyBillView: React.FC<MonthlyBillViewProps> = ({ data, approved
                         </div>
                         <div>
                             <h2 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Detaljni Obračun</h2>
-                            <p className="text-sm text-slate-500 dark:text-slate-400 font-bold">{data.monthName} 2025</p>
+                            <p className="text-sm text-slate-500 dark:text-slate-400 font-bold">{data.monthName} 2026</p>
                         </div>
                     </div>
 
@@ -177,9 +177,18 @@ export const MonthlyBillView: React.FC<MonthlyBillViewProps> = ({ data, approved
 
                 {/* Section 2: Detailed Math Breakdown */}
                 <section className="space-y-6">
-                    <BillSection title="1. Potrošnja i Mreža (RSD)">
+                    <BillSection title="1. Potrošnja, Mreža i Isporučena Energija (RSD)">
                         <BillRow label="Aktivna energija (VT)" qty={activeData.netVT} price={rates.activeEnergyVT} total={activeData.energyCostVT} />
                         <BillRow label="Aktivna energija (NT)" qty={activeData.grossNT} price={rates.activeEnergyNT} total={activeData.energyCostNT} />
+                        {isSolarEnabled && activeData.recognizedExportKwh > 0 && (
+                            <BillRow
+                                label="Isporučena energija (VT)"
+                                qty={activeData.recognizedExportKwh}
+                                price={rates.activeEnergyVT * 0.9}
+                                total={-activeData.solarCreditVT}
+                                isNegative
+                            />
+                        )}
                         <BillRow label="Odobrena snaga" qty={approvedPower} price={rates.approvedPowerPrice} total={activeData.powerCost} />
                         <BillRow label="Viša dnevna tarifa za aktivnu energiju" qty={activeData.netVT} price={rates.distributionVT} total={activeData.distCostVT} />
                         <BillRow label="Niža dnevna tarifa za aktivnu energiju" qty={activeData.grossNT} price={rates.distributionNT} total={activeData.distCostNT} />
@@ -221,7 +230,7 @@ export const MonthlyBillView: React.FC<MonthlyBillViewProps> = ({ data, approved
                     <div className="p-8 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-3xl flex justify-between items-center shadow-2xl">
                         <div>
                             <p className="text-[10px] font-black uppercase tracking-widest opacity-60">Ukupo za uplatu</p>
-                            <p className="text-xs font-bold">{activeData.monthName} / 2025</p>
+                            <p className="text-xs font-bold">{activeData.monthName} / 2026</p>
                         </div>
                         <div className="text-right">
                             <p className="text-4xl font-black tracking-tighter">{formatCurrency(activeData.totalBill)}</p>
@@ -266,14 +275,16 @@ const BillSection = ({ title, children }: { title: string, children: React.React
     </div>
 );
 
-const BillRow = ({ label, qty, price, total, isTotalSmall }: { label: string, qty?: number, price?: number, total: number, isTotalSmall?: boolean }) => (
+const BillRow = ({ label, qty, price, total, isTotalSmall, isNegative }: { label: string, qty?: number, price?: number, total: number, isTotalSmall?: boolean, isNegative?: boolean }) => (
     <div className="flex justify-between items-center py-1 group">
         <span className="text-sm font-medium text-slate-600 dark:text-slate-400 group-hover:text-amber-500 transition-colors">{label}</span>
         <div className="flex items-center gap-4">
             {qty !== undefined && price !== undefined && (
                 <span className="text-[10px] text-slate-400 font-mono italic">{Math.round(qty).toLocaleString()} x {price.toFixed(2)}</span>
             )}
-            <span className={`${isTotalSmall ? 'text-xs text-slate-500 font-bold' : 'text-sm font-black text-slate-800 dark:text-slate-200'} font-mono`}>{formatCurrency(total)}</span>
+            <span className={`${isTotalSmall ? 'text-xs text-slate-500 font-bold' : 'text-sm font-black ' + (isNegative ? 'text-emerald-600' : 'text-slate-800 dark:text-slate-200')} font-mono`}>
+                {isNegative ? '-' : ''}{formatCurrency(Math.abs(total))}
+            </span>
         </div>
     </div>
 );

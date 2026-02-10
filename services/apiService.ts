@@ -305,15 +305,18 @@ class ApiService {
   public async getCurrentMonthStats(projectId: string, isDemo: boolean = false): Promise<EnergySeriesPoint> {
     if (isDemo) {
       const now = new Date();
-      const daysPassed = now.getDate();
-      // Refined monthly profile: avg 180kwh/day generation for summer
+      const daysPassed = now.getDate() - 1; // full days
+      const hoursToday = now.getHours();
+      const progress = daysPassed + (hoursToday / 24);
+
+      // Refined monthly profile: avg yield for the current month
       const baseYield = [55, 75, 115, 145, 175, 195, 210, 190, 140, 95, 60, 45];
-      const dailyYield = baseYield[now.getMonth()] / 30;
+      const monthlyTotalYield = baseYield[now.getMonth()];
       const capacity = 50;
 
-      const gen = daysPassed * capacity * dailyYield * (0.9 + Math.random() * 0.2);
-      const cons = daysPassed * 160 * (0.9 + Math.random() * 0.2); // steady industrial load
-      const vt = cons * 0.75; // More load during day for industrial
+      const gen = progress * capacity * (monthlyTotalYield / 30) * (0.9 + Math.random() * 0.2);
+      const cons = progress * 160 * (0.9 + Math.random() * 0.2); // steady industrial load
+      const vt = cons * 0.75;
       const nt = cons * 0.25;
       const self = Math.min(gen, vt);
 
@@ -328,7 +331,10 @@ class ApiService {
         export: Math.max(0, gen - self),
         import: (vt - self) + nt,
         importVT: Math.max(0, vt - self),
-        importNT: nt
+        importNT: nt,
+        reactiveConsumptionVT: vt * 0.1, // Simulated 
+        reactiveConsumptionNT: nt * 0.1,
+        maxPower: 45 + Math.random() * 10
       } as any;
     }
 
@@ -450,39 +456,75 @@ class ApiService {
         if (range === 'day') {
           // Hourly data for today
           const hourDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), i);
-          gen = this.getDemoGeneration(hourDate);
-          cons = this.getDemoConsumption(hourDate);
+          if (hourDate > now) {
+            gen = 0;
+            cons = 0;
+          } else {
+            gen = this.getDemoGeneration(hourDate);
+            cons = this.getDemoConsumption(hourDate);
+          }
           label = `${i}:00`;
           timestamp = hourDate.toISOString();
         } else if (range === 'week') {
           // Daily data for last 7 days
-          const dayDate = new Date(now.getTime() - (6 - i) * 24 * 60 * 60 * 1000);
-          // Sum 24 hours for daily total
-          for (let h = 0; h < 24; h++) {
-            const hourDate = new Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate(), h);
-            gen += this.getDemoGeneration(hourDate);
-            cons += this.getDemoConsumption(hourDate);
+          const dayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0);
+          dayDate.setDate(now.getDate() - (6 - i));
+
+          if (dayDate > now) {
+            gen = 0;
+            cons = 0;
+          } else {
+            // Sum 24 hours for daily total
+            for (let h = 0; h < 24; h++) {
+              const hourDate = new Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate(), h);
+              if (hourDate <= now) {
+                gen += this.getDemoGeneration(hourDate);
+                cons += this.getDemoConsumption(hourDate);
+              }
+            }
           }
           label = dayDate.toLocaleDateString('sr-RS', { day: 'numeric', month: 'short' });
           timestamp = dayDate.toISOString();
         } else if (range === 'month') {
           // Daily data for last 30 days
-          const dayDate = new Date(now.getTime() - (29 - i) * 24 * 60 * 60 * 1000);
-          for (let h = 0; h < 24; h++) {
-            const hourDate = new Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate(), h);
-            gen += this.getDemoGeneration(hourDate);
-            cons += this.getDemoConsumption(hourDate);
+          const dayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0);
+          dayDate.setDate(now.getDate() - (29 - i));
+
+          if (dayDate > now) {
+            gen = 0;
+            cons = 0;
+          } else {
+            for (let h = 0; h < 24; h++) {
+              const hourDate = new Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate(), h);
+              if (hourDate <= now) {
+                gen += this.getDemoGeneration(hourDate);
+                cons += this.getDemoConsumption(hourDate);
+              }
+            }
           }
           label = `Dan ${i + 1}`;
           timestamp = dayDate.toISOString();
         } else {
           // Monthly data for year
-          const monthDate = new Date(now.getFullYear(), i, 15);
-          const daysInMonth = new Date(now.getFullYear(), i + 1, 0).getDate();
-          // Calculate monthly totals using TMY values
-          gen = this.TMY_MONTHLY_KWH[i] * this.CAPACITY_KW;
-          // Consumption: ~113,000 kWh/year / 12 months with variation
-          cons = (113000 / 12) * (0.9 + 0.2 * this.seededRandom(i * 1000));
+          const monthDate = new Date(now.getFullYear(), i, 1);
+          if (monthDate > now) {
+            gen = 0;
+            cons = 0;
+          } else {
+            const isCurrentMonth = monthDate.getMonth() === now.getMonth() && monthDate.getFullYear() === now.getFullYear();
+            if (isCurrentMonth) {
+              // Reuse getCurrentMonthStats logic for demo current month consistency
+              const daysPassed = now.getDate() - 1;
+              const hoursToday = now.getHours();
+              const progress = daysPassed + (hoursToday / 24);
+              const monthlyTotalYield = this.TMY_MONTHLY_KWH[i] * this.CAPACITY_KW;
+              gen = (progress / 30) * monthlyTotalYield;
+              cons = (progress / 30) * (113000 / 12) * (0.9 + 0.2 * this.seededRandom(i * 1000));
+            } else {
+              gen = this.TMY_MONTHLY_KWH[i] * this.CAPACITY_KW;
+              cons = (113000 / 12) * (0.9 + 0.2 * this.seededRandom(i * 1000));
+            }
+          }
           label = monthNames[i];
           timestamp = monthDate.toISOString();
         }

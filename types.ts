@@ -163,6 +163,8 @@ export interface MonthlyCalculation {
   recognizedExportKwh: number;
   surplusKwhRemaining: number;
   solarCreditGenerated: number;
+  solarCreditVT: number;  // New
+  solarCreditNT: number;  // New
   netVT: number;
   energyCostVT: number;
   energyCostNT: number;

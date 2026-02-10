@@ -36,13 +36,17 @@ export const calculateRow = (
     const energyCostNT = preuzetaNT * rates.activeEnergyNT;
     const energyTotal = energyCostVT + energyCostNT;
 
-    // The Solar Credit (Finance) - 90% of VT price for the recognized KWh
-    const solarCreditGenerated = recognizedExportKwh * (rates.activeEnergyVT * 0.9);
+    // The Solar Credit (Finance) - 90% of Active Energy price for the recognized KWh
+    // Even if NT export is usually 0, logic remains consistent
+    const solarCreditVT = recognizedExportKwh * (rates.activeEnergyVT * 0.9);
+    const solarCreditNT = 0; // Export at night is not possible with solar
+    const solarCreditGenerated = solarCreditVT + solarCreditNT;
 
     // --- NEW: Reactive Energy Calculation ---
     // limit for reactive energy is 0.32868 * active energy (for cos(phi)=0.95)
-    const reactiveLimitVT = preuzetaVT * 0.32868;
-    const reactiveLimitNT = preuzetaNT * 0.32868;
+    // Rule: Limit is based on NET active energy
+    const reactiveLimitVT = netVT * 0.32868;
+    const reactiveLimitNT = netNT * 0.32868;
 
     const reactiveImportVT = input.reactiveImportVT || 0;
     const reactiveImportNT = input.reactiveImportNT || 0;
@@ -90,6 +94,8 @@ export const calculateRow = (
         recognizedExportKwh,
         surplusKwhRemaining,
         solarCreditGenerated,
+        solarCreditVT,
+        solarCreditNT,
         netVT,
         energyCostVT,
         energyCostNT,
@@ -159,7 +165,7 @@ export const calculateAnnual = (
 };
 
 export const calculateInvestmentAnalysis = (
-    annualResult: CalculationResult,
+    annualResultWithSolar: CalculationResult,
     originalInputs: MonthlyInput[],
     rates: TariffRates,
     approvedPower: number,
@@ -167,6 +173,7 @@ export const calculateInvestmentAnalysis = (
     inflationRatePercent: number = 3,
     years: number = 20
 ): InvestmentAnalysis => {
+    // 1. Calculate historical baseline (No Solar) based on same inputs
     const baselineInputs = originalInputs.map(i => ({
         ...i,
         solarProduction: 0,
@@ -176,16 +183,16 @@ export const calculateInvestmentAnalysis = (
         selfConsumption: 0
     }));
     const baselineResult = calculateAnnual(baselineInputs, rates, approvedPower, 0);
-    const baselineAnnualBill = baselineResult.totalAnnualBill;
 
-    const year1Savings = baselineAnnualBill - annualResult.totalAnnualBill;
+    // 2. Realized savings (normalized for full year simulation)
+    const annualSavingsBasis = baselineResult.totalAnnualBill - annualResultWithSolar.totalAnnualBill;
 
     const cashFlows: CashFlowYear[] = [];
     let cumulative = -investmentCost;
     let paybackPeriod = 0;
     let paybackFound = false;
-    let totalSavings = 0;
 
+    // Year 0: Investment outlay
     cashFlows.push({
         year: 0,
         energySavings: 0,
@@ -197,11 +204,14 @@ export const calculateInvestmentAnalysis = (
     const inflationRate = 1 + (inflationRatePercent / 100);
 
     for (let y = 1; y <= years; y++) {
-        const currentYearSavings = year1Savings * Math.pow(inflationRate, y - 1);
+        // Compound inflation on savings
+        const currentYearSavings = annualSavingsBasis * Math.pow(inflationRate, y - 1);
+
+        // Maintenance estimated at 0.5% after 2 years
         const maintenance = y > 2 ? investmentCost * 0.005 : 0;
         const netFlow = currentYearSavings - maintenance;
+
         cumulative += netFlow;
-        totalSavings += netFlow;
 
         if (!paybackFound && cumulative >= 0) {
             const prevCumulative = cashFlows[y - 1].cumulativeCashFlow;
@@ -219,8 +229,8 @@ export const calculateInvestmentAnalysis = (
         });
     }
 
-    const totalReturned = cashFlows.reduce((sum, cf) => (cf.year > 0 ? sum + cf.netCashFlow : sum), 0);
-    const roi = ((totalReturned - investmentCost) / investmentCost) * 100;
+    const totalSavings = cashFlows.reduce((sum, cf) => (cf.year > 0 ? sum + cf.netCashFlow : sum), 0);
+    const roi = ((totalSavings - investmentCost) / investmentCost) * 100;
     const irr = calculateIRR(cashFlows.map(cf => cf.netCashFlow));
 
     return {
@@ -229,7 +239,7 @@ export const calculateInvestmentAnalysis = (
         paybackPeriod: paybackFound ? paybackPeriod : 0,
         roi,
         irr: irr * 100,
-        totalSavings: totalReturned,
+        totalSavings,
         cashFlows
     };
 };
