@@ -163,11 +163,15 @@ export const MonthlyBillView: React.FC<MonthlyBillViewProps> = ({ data, approved
                             <p className="text-[9px] font-black text-slate-400 uppercase mb-2">Isporučena Energija / Ostalo</p>
                             <div className="space-y-1">
                                 <div className="flex justify-between text-xs">
-                                    <span className="text-slate-500">Aktivna Isporučena:</span>
-                                    <span className="font-bold text-emerald-600 dark:text-emerald-500">{Math.round(activeData.solarExported).toLocaleString()} kWh</span>
+                                    <span className="text-slate-500">Isporučena VT:</span>
+                                    <span className="font-bold text-emerald-600 dark:text-emerald-500">{Math.round(activeData.solarExportVT).toLocaleString()} kWh</span>
                                 </div>
                                 <div className="flex justify-between text-xs">
-                                    <span className="text-slate-500">Stanje Maksigrafa:</span>
+                                    <span className="text-slate-500">Isporučena NT:</span>
+                                    <span className="font-bold text-emerald-600 dark:text-emerald-500">{Math.round(activeData.solarExportNT).toLocaleString()} kWh</span>
+                                </div>
+                                <div className="flex justify-between text-xs">
+                                    <span className="text-slate-500">Maksigraf (Peak):</span>
                                     <span className="font-bold text-amber-600 dark:text-amber-500">{activeData.maxPower.toFixed(2)} kW</span>
                                 </div>
                             </div>
@@ -180,15 +184,8 @@ export const MonthlyBillView: React.FC<MonthlyBillViewProps> = ({ data, approved
                     <BillSection title="1. Potrošnja, Mreža i Isporučena Energija (RSD)">
                         <BillRow label="Aktivna energija (VT)" qty={activeData.netVT} price={rates.activeEnergyVT} total={activeData.energyCostVT} />
                         <BillRow label="Aktivna energija (NT)" qty={activeData.grossNT} price={rates.activeEnergyNT} total={activeData.energyCostNT} />
-                        {isSolarEnabled && activeData.recognizedExportKwh > 0 && (
-                            <BillRow
-                                label="Isporučena energija (VT)"
-                                qty={activeData.recognizedExportKwh}
-                                price={rates.activeEnergyVT * 0.9}
-                                total={-activeData.solarCreditVT}
-                                isNegative
-                            />
-                        )}
+                        <BillRow label="Isporučena energija (VT)" qty={0} price={rates.activeEnergyVT * 0.9} total={0} isNegative />
+                        <BillRow label="Isporučena energija (NT)" qty={0} price={0} total={0} isNegative />
                         <BillRow label="Odobrena snaga" qty={approvedPower} price={rates.approvedPowerPrice} total={activeData.powerCost} />
                         <BillRow label="Viša dnevna tarifa za aktivnu energiju" qty={activeData.netVT} price={rates.distributionVT} total={activeData.distCostVT} />
                         <BillRow label="Niža dnevna tarifa za aktivnu energiju" qty={activeData.grossNT} price={rates.distributionNT} total={activeData.distCostNT} />
@@ -196,6 +193,8 @@ export const MonthlyBillView: React.FC<MonthlyBillViewProps> = ({ data, approved
 
                     <BillSection title="2. Reaktivna Energija i Maksigraf">
                         <BillRow label="Reaktivna energija" qty={(activeData.reactiveConsumptionVT || 0) + (activeData.reactiveConsumptionNT || 0)} price={rates.reactiveEnergyPrice} total={activeData.reactiveCost} />
+                        <BillRow label="Prekomerna aktivna snaga" qty={activeData.excessActivePower} price={0} total={0} />
+                        <BillRow label="Prekomerna reaktivna snaga" qty={activeData.excessReactivePower} price={0} total={0} />
                         {(activeData.excessReactiveCost || 0) > 0 && (
                             <BillRow label="Prekomerna reaktivna energija" qty={(activeData.excessReactiveVT || 0) + (activeData.excessReactiveNT || 0)} price={rates.excessReactiveEnergyPrice} total={activeData.excessReactiveCost} />
                         )}

@@ -334,7 +334,7 @@ class ApiService {
         importNT: nt,
         reactiveConsumptionVT: vt * 0.1, // Simulated 
         reactiveConsumptionNT: nt * 0.1,
-        maxPower: 45 + Math.random() * 10
+        maxPower: 20
       } as any;
     }
 

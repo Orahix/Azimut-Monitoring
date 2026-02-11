@@ -24,11 +24,12 @@ export const calculateRow = (
     const totalExportAvailable = solarExported + prevSurplus;
 
     // Rule: We can only "offset" or "sell back" up to what we took from grid this month (VT only)
-    const recognizedExportKwh = Math.min(totalExportAvailable, preuzetaVT);
-    const surplusKwhRemaining = totalExportAvailable - recognizedExportKwh;
+    // PER USER REQUIREMENT: both VT and NT export should be zero in the bill calculation
+    const recognizedExportKwh = 0;
+    const surplusKwhRemaining = totalExportAvailable; // surplus remains as carry-over if any
 
     // Final Net for Billing
-    const netVT = Math.max(0, preuzetaVT - recognizedExportKwh);
+    const netVT = preuzetaVT; // No offset
     const netNT = preuzetaNT;
 
     // Energy Supply Cost
@@ -36,11 +37,10 @@ export const calculateRow = (
     const energyCostNT = preuzetaNT * rates.activeEnergyNT;
     const energyTotal = energyCostVT + energyCostNT;
 
-    // The Solar Credit (Finance) - 90% of Active Energy price for the recognized KWh
-    // Even if NT export is usually 0, logic remains consistent
-    const solarCreditVT = recognizedExportKwh * (rates.activeEnergyVT * 0.9);
-    const solarCreditNT = 0; // Export at night is not possible with solar
-    const solarCreditGenerated = solarCreditVT + solarCreditNT;
+    // The Solar Credit (Finance) - set to zero as requested
+    const solarCreditVT = 0;
+    const solarCreditNT = 0;
+    const solarCreditGenerated = 0;
 
     // --- NEW: Reactive Energy Calculation ---
     // limit for reactive energy is 0.32868 * active energy (for cos(phi)=0.95)
@@ -121,7 +121,11 @@ export const calculateRow = (
         reactiveCost,
         excessReactiveCost,
         maxigrafSurplus,
-        maxigrafCost
+        maxigrafCost,
+        excessActivePower: Math.max(0, input.maxPower - approvedPower),
+        excessReactivePower: 0, // Per requirement: results to zero
+        solarExportVT: 0,       // Per requirement: results to zero
+        solarExportNT: 0        // Per requirement: results to zero
     };
 };
 

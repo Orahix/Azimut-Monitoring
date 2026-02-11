@@ -42,6 +42,7 @@ export interface EnergySeriesPoint {
   import: number;
   importVT: number; // New: Grid import during High Tariff
   importNT: number; // New: Grid import during Low Tariff
+  maxPower?: number; // New: Peak power recorded in period
 }
 
 export enum ViewMode {
@@ -192,6 +193,10 @@ export interface MonthlyCalculation {
   excessReactiveCost: number;
   maxigrafSurplus: number;
   maxigrafCost: number;
+  excessActivePower: number;   // New: Alias/Specific field for "Prekomerna aktivna snaga"
+  excessReactivePower: number; // New: Value for "Prekomerna reaktivna snaga"
+  solarExportVT: number;       // New: Quantity for "Isporučena energija VT"
+  solarExportNT: number;       // New: Quantity for "Isporučena energija NT"
 }
 
 export interface CalculationResult {
