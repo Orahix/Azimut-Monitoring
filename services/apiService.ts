@@ -323,6 +323,7 @@ class ApiService {
       return {
         label: now.toLocaleString('sr-RS', { month: 'long' }),
         timestamp: now.toISOString(),
+        year: now.getFullYear(),
         generation: gen,
         consumption: cons,
         consumptionVT: vt,
@@ -773,6 +774,7 @@ class ApiService {
         result.push({
           label: monthNames[mIdx],
           timestamp: d.toISOString(),
+          year: d.getFullYear(),
           generation: gen,
           consumption: cons,
           consumptionVT: vt,
@@ -827,6 +829,7 @@ class ApiService {
       result.push({
         label: monthNames[m.m],
         timestamp: d.toISOString(),
+        year: d.getFullYear(),
         generation: m.g,
         consumption: m.c,
         consumptionVT: m.vt,

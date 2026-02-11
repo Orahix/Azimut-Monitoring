@@ -78,7 +78,8 @@ export const MonthlyBillView: React.FC<MonthlyBillViewProps> = ({ data, approved
             export: 0,
             reactiveExportVT: 0,
             reactiveExportNT: 0,
-            selfConsumption: 0
+            selfConsumption: 0,
+            year: data.year
         }, rates, approvedPower, 0, 0);
     }, [data, rates, approvedPower]);
 
@@ -96,7 +97,7 @@ export const MonthlyBillView: React.FC<MonthlyBillViewProps> = ({ data, approved
                         </div>
                         <div>
                             <h2 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Detaljni Obračun</h2>
-                            <p className="text-sm text-slate-500 dark:text-slate-400 font-bold">{data.monthName} 2026</p>
+                            <p className="text-sm text-slate-500 dark:text-slate-400 font-bold">{data.monthName} {data.year}</p>
                         </div>
                     </div>
 

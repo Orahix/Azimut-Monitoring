@@ -31,6 +31,7 @@ export const LiveBillCard: React.FC<LiveBillCardProps> = ({ project, rates = DEF
                 const currentCalc = calculateRow({
                     id: new Date().getMonth(),
                     monthName: new Date().toLocaleString('sr-RS', { month: 'long' }),
+                    year: stats.year || new Date().getFullYear(),
                     vt: stats.consumptionVT,
                     nt: stats.consumptionNT,
                     maxPower: stats.maxPower || 0,
@@ -49,6 +50,7 @@ export const LiveBillCard: React.FC<LiveBillCardProps> = ({ project, rates = DEF
                 const baselineCalc = calculateRow({
                     id: new Date().getMonth(),
                     monthName: new Date().toLocaleString('sr-RS', { month: 'long' }),
+                    year: stats.year || new Date().getFullYear(),
                     vt: stats.consumptionVT,
                     nt: stats.consumptionNT,
                     maxPower: stats.maxPower || 0,

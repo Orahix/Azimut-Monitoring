@@ -83,6 +83,7 @@ export const calculateRow = (
     return {
         monthId: input.id,
         monthName: input.monthName,
+        year: input.year,
         maxPower: input.maxPower,
         grossVT: input.vt,
         grossNT: input.nt,

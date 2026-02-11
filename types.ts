@@ -43,6 +43,7 @@ export interface EnergySeriesPoint {
   importVT: number; // New: Grid import during High Tariff
   importNT: number; // New: Grid import during Low Tariff
   maxPower?: number; // New: Peak power recorded in period
+  year?: number;      // New: Year for historical data
 }
 
 export enum ViewMode {
@@ -135,6 +136,7 @@ export interface TariffRates {
 export interface MonthlyInput {
   id: number;
   monthName: string;
+  year: number;        // New: Support historical years
   vt: number;
   nt: number;
   maxPower: number;
@@ -153,6 +155,7 @@ export interface MonthlyInput {
 export interface MonthlyCalculation {
   monthId: number;
   monthName: string;
+  year: number;        // New: Track actual year for the bill
   maxPower: number;
   grossVT: number;
   grossNT: number;

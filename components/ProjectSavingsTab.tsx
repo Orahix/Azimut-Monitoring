@@ -57,6 +57,7 @@ export const ProjectSavingsTab: React.FC<ProjectSavingsTabProps> = ({ project, t
                     const inputs = stats.map((s, i) => ({
                         id: i,
                         monthName: s.label, // These are now already Jan, Feb, etc. from rolling stats
+                        year: s.year || 2026,
                         vt: s.consumptionVT,
                         nt: s.consumptionNT,
                         maxPower: s.maxPower || 0,
