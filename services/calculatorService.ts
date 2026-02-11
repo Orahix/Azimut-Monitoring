@@ -278,7 +278,7 @@ export const DEFAULT_RATES: TariffRates = {
     reactiveEnergy: 0.528,
     reactiveEnergyPrice: 1.13,
     excessReactiveEnergyPrice: 2.261,
-    maxigrafSurplusPrice: 694.504,
+    maxigrafSurplusPrice: 695.504,
     tvFee: 0,
     investmentCost: 4000000
 };

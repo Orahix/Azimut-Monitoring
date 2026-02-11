@@ -193,14 +193,9 @@ export const MonthlyBillView: React.FC<MonthlyBillViewProps> = ({ data, approved
 
                     <BillSection title="2. Reaktivna Energija i Maksigraf">
                         <BillRow label="Reaktivna energija" qty={(activeData.reactiveConsumptionVT || 0) + (activeData.reactiveConsumptionNT || 0)} price={rates.reactiveEnergyPrice} total={activeData.reactiveCost} />
-                        <BillRow label="Prekomerna aktivna snaga" qty={activeData.excessActivePower} price={0} total={0} />
+                        <BillRow label="Prekomerna reaktivna energija" qty={(activeData.excessReactiveVT || 0) + (activeData.excessReactiveNT || 0)} price={rates.excessReactiveEnergyPrice} total={activeData.excessReactiveCost} />
+                        <BillRow label="Prekomerna aktivna snaga" qty={activeData.maxigrafSurplus} price={rates.maxigrafSurplusPrice} total={activeData.maxigrafCost} />
                         <BillRow label="Prekomerna reaktivna snaga" qty={activeData.excessReactivePower} price={0} total={0} />
-                        {(activeData.excessReactiveCost || 0) > 0 && (
-                            <BillRow label="Prekomerna reaktivna energija" qty={(activeData.excessReactiveVT || 0) + (activeData.excessReactiveNT || 0)} price={rates.excessReactiveEnergyPrice} total={activeData.excessReactiveCost} />
-                        )}
-                        {(activeData.maxigrafCost || 0) > 0 && (
-                            <BillRow label="Prekomerna snaga (Maksigraf)" qty={activeData.maxigrafSurplus} price={rates.maxigrafSurplusPrice} total={activeData.maxigrafCost} />
-                        )}
                     </BillSection>
 
                     <BillSection title="3. Naknade i Takse">
