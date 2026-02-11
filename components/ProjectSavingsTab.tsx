@@ -51,22 +51,25 @@ export const ProjectSavingsTab: React.FC<ProjectSavingsTabProps> = ({ project, t
         const fetchData = async () => {
             setLoading(true);
             try {
-                const currentYear = new Date().getFullYear();
-                const stats = await apiService.getYearlyStats(project.id, currentYear, project.isDemo);
+                const stats = await apiService.getRollingYearStats(project.id, project.isDemo);
 
                 if (stats && stats.length > 0) {
                     const inputs = stats.map((s, i) => ({
                         id: i,
-                        monthName: s.label,
+                        monthName: s.label, // These are now already Jan, Feb, etc. from rolling stats
                         vt: s.consumptionVT,
                         nt: s.consumptionNT,
-                        maxPower: 0,
+                        maxPower: s.maxPower || 0,
                         solarProduction: s.generation,
                         // Sync with physical flows
                         importVT: (s as any).importVT !== undefined ? (s as any).importVT : (s.import * 0.7), // Fallback to 70/30 if not explicit
                         importNT: (s as any).importNT !== undefined ? (s as any).importNT : (s.import * 0.3),
                         export: s.export,
-                        selfConsumption: s.selfConsumption
+                        selfConsumption: s.selfConsumption,
+                        reactiveImportVT: 0,
+                        reactiveImportNT: 0,
+                        reactiveExportVT: 0,
+                        reactiveExportNT: 0
                     }));
 
                     const res = calculateAnnual(inputs, rates, project.installedPowerKw, 70);

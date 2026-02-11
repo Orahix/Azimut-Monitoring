@@ -138,9 +138,10 @@ export const calculateAnnual = (
     const details: MonthlyCalculation[] = [];
     let surplus = 0;
 
-    inputs.forEach((input, index) => {
-        // Reset surplus in April (Month Index 3) per Serbian "Prosumer" rules
-        if (index === 3) surplus = 0;
+    inputs.forEach((input) => {
+        // Reset surplus in April per Serbian "Prosumer" rules
+        // Check by name to handle rolling years correctly
+        if (input.monthName.toLowerCase() === 'april') surplus = 0;
 
         const row = calculateRow(input, rates, approvedPower, surplus, selfConsumptionPercent);
         details.push(row);

@@ -743,6 +743,103 @@ class ApiService {
       } as any;
     });
   }
+
+  public async getRollingYearStats(projectId: string, isDemo: boolean = false): Promise<EnergySeriesPoint[]> {
+    const now = new Date();
+    const result: EnergySeriesPoint[] = [];
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "Maj", "Jun", "Jul", "Avg", "Sep", "Okt", "Nov", "Dec"];
+
+    if (isDemo) {
+      // Return last 12 months ending with current month
+      for (let i = 11; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const mIdx = d.getMonth();
+        const isCurrentMonth = i === 0;
+
+        let gen, cons;
+        if (isCurrentMonth) {
+          const stats = await this.getCurrentMonthStats(projectId, true);
+          gen = stats.generation;
+          cons = stats.consumption;
+        } else {
+          gen = this.TMY_MONTHLY_KWH[mIdx] * this.CAPACITY_KW;
+          cons = (113000 / 12) * (0.9 + 0.2 * this.seededRandom(mIdx * 1000));
+        }
+
+        const vt = cons * 0.7;
+        const nt = cons * 0.3;
+        const self = Math.min(gen, vt);
+
+        result.push({
+          label: monthNames[mIdx],
+          timestamp: d.toISOString(),
+          generation: gen,
+          consumption: cons,
+          consumptionVT: vt,
+          consumptionNT: nt,
+          selfConsumption: self,
+          export: Math.max(0, gen - self),
+          import: (vt - self) + nt,
+          importVT: Math.max(0, vt - self),
+          importNT: nt,
+          maxPower: 20
+        } as any);
+      }
+      return result;
+    }
+
+    // Real data logic
+    const startDate = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+    const endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+
+    const res = await this.queryWithTimeout<any>(supabase
+      .from('hourly_stats')
+      .select('*')
+      .eq('project_id', projectId)
+      .gte('start_time', startDate.toISOString())
+      .lte('start_time', endDate.toISOString())
+      .order('start_time', { ascending: true }));
+
+    if (!res || res.error || !res.data) return [];
+
+    const monthData: { [key: string]: any } = {};
+    res.data.forEach((row: any) => {
+      const d = new Date(row.start_time);
+      const key = `${d.getFullYear()}-${d.getMonth()}`;
+      if (!monthData[key]) {
+        monthData[key] = { g: 0, c: 0, vt: 0, nt: 0, m: d.getMonth(), y: d.getFullYear() };
+      }
+      const h = d.getHours();
+      const g = row.total_energy_produced || 0;
+      const c = row.total_energy_consumed || 0;
+      monthData[key].g += g;
+      monthData[key].c += c;
+      if (h >= 7 && h < 23) monthData[key].vt += c;
+      else monthData[key].nt += c;
+    });
+
+    // Ensure 12 months are represented even if empty
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${d.getMonth()}`;
+      const m = monthData[key] || { g: 0, c: 0, vt: 0, nt: 0, m: d.getMonth(), y: d.getFullYear() };
+      const self = Math.min(m.g, m.vt);
+      result.push({
+        label: monthNames[m.m],
+        timestamp: d.toISOString(),
+        generation: m.g,
+        consumption: m.c,
+        consumptionVT: m.vt,
+        consumptionNT: m.nt,
+        selfConsumption: self,
+        export: Math.max(0, m.g - self),
+        import: (m.vt - self) + m.nt,
+        importVT: Math.max(0, m.vt - self),
+        importNT: m.nt
+      } as any);
+    }
+    return result;
+  }
 }
 
 export const apiService = new ApiService();
